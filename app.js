@@ -9,7 +9,8 @@ const ui = {
   favOnly: false,
   recipeId: null,
   servings: 0,
-  scroll: 0
+  scroll: 0,
+  customAiLoading: false
 };
 
 const $view = document.getElementById('view');
@@ -144,6 +145,13 @@ function resultsView() {
     <button class="${ui.sortBy === 'time' ? 'active' : ''}" data-act="sort" data-v="time">${t('sortTime', state.lang)}</button>
   </div>`;
 
+  // ITT VAN VISSZA A GOMB: AI KITALÁLÁS AZ ALAPANYAGOKBÓL
+  html += `<div style="margin: 14px 0;">
+    <button class="primary wide" data-act="generateCustomAI" ${ui.customAiLoading ? 'disabled' : ''}>
+      ${ui.customAiLoading ? t('aiLoading', state.lang) : t('aiGenBtn', state.lang)}
+    </button>
+  </div>`;
+
   html += recipeSection(t('readyRecipes', state.lang), ready);
   html += recipeSection(t('almostRecipes', state.lang), almost);
   
@@ -202,9 +210,9 @@ function detailView() {
   const fav = state.favorites.indexOf(r.id) >= 0;
 
   const rows = r.ing.map(x => {
-    return `<div class="ingrow"><span class="ok">✨</span>
+    return `<div class="ingrow"><span class="ok">🍲</span>
       <span class="grow">${esc(x.name)}</span>
-      <span class="muted amount">${esc(x.amount)}</span></div>`;
+      <span class="muted amount">${esc(AM ? AM.scale(x.amount, factor) : x.amount)}</span></div>`;
   }).join('');
 
   return `<div class="detailbar"><button class="link" data-act="back">${t('backBtn', state.lang)}</button>
@@ -371,6 +379,22 @@ const actions = {
     persist();
     await render();
     toast(state.lang === 'en' ? 'Language switched to English' : 'Nyelv átállítva magyarra');
+  },
+  generateCustomAI: async () => {
+    ui.customAiLoading = true;
+    render();
+    try {
+      const customRecipe = await fetchCustomAIRecipe(state);
+      state.aiRecipes = [customRecipe].concat(state.aiRecipes || []);
+      persist();
+      openRecipe(customRecipe.id);
+      toast(state.lang === 'en' ? 'Recipe generated successfully! ✨' : 'Recept sikeresen kitalálva! ✨');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      ui.customAiLoading = false;
+      render();
+    }
   }
 };
 
@@ -405,7 +429,7 @@ document.addEventListener('submit', e => {
     const input = document.getElementById('apikeyInput');
     if (input) {
       state.apiKey = input.value.trim();
-      state.lastDailyDate = ''; // Hogy az új kulccsal azonnal lekérje a napi recepteket
+      state.lastDailyDate = ''; 
       persist();
       toast(t('keySavedToast', state.lang));
     }

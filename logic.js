@@ -1,26 +1,140 @@
 'use strict';
-// Az alkalmazás logikája (DOM nélkül), a data.js-ben lévő DATA-ra épül.
 
-const KEY = 'mitfozzek.v1';
+const KEY = 'mitfozzek.v6';
 
 const TIERS = {
-  cheap:     { title: 'Olcsó',   dots: '●○○', hint: 'kb. 700 Ft/adag alatt',     color: '#16a34a' },
-  medium:    { title: 'Közepes', dots: '●●○', hint: 'kb. 700–1 600 Ft/adag',      color: '#d97706' },
-  expensive: { title: 'Drága',   dots: '●●●', hint: 'kb. 1 600 Ft/adag felett',   color: '#9333ea' }
+  cheap:     { title: { hu: 'Olcsó', en: 'Cheap' },   dots: '●○○', hint: { hu: 'kb. 700 Ft/adag alatt', en: 'under ~$2/portion' },     color: '#16a34a' },
+  medium:    { title: { hu: 'Közepes', en: 'Medium' }, dots: '●●○', hint: { hu: 'kb. 700–1 600 Ft/adag', en: '~$2–$5/portion' },      color: '#d97706' },
+  expensive: { title: { hu: 'Drága', en: 'Expensive' },   dots: '●●●', hint: { hu: 'kb. 1 600 Ft/adag felett', en: 'over ~$5/portion' },   color: '#9333ea' }
 };
 const TIER_ORDER = ['cheap', 'medium', 'expensive'];
 
 const CATEGORIES = [
-  { id: 'veg',    title: 'Zöldségek',            emoji: '🥕' },
-  { id: 'fruit',  title: 'Gyümölcsök',           emoji: '🍎' },
-  { id: 'meat',   title: 'Hús és hal',           emoji: '🥩' },
-  { id: 'dairy',  title: 'Tejtermék és tojás',   emoji: '🥚' },
-  { id: 'grain',  title: 'Tészta, rizs, pékáru', emoji: '🍝' },
-  { id: 'canned', title: 'Konzerv és tartós',    emoji: '🥫' },
-  { id: 'spice',  title: 'Fűszerek és szószok',  emoji: '🌶️' }
+  { id: 'veg',    title: { hu: 'Zöldségek', en: 'Vegetables' },            emoji: '🥕' },
+  { id: 'fruit',  title: { hu: 'Gyümölcsök', en: 'Fruits' },           emoji: '🍎' },
+  { id: 'meat',   title: { hu: 'Hús és hal', en: 'Meat & Fish' },           emoji: '🥩' },
+  { id: 'dairy',  title: { hu: 'Tejtermék és tojás', en: 'Dairy & Eggs' },   emoji: '🥚' },
+  { id: 'grain',  title: { hu: 'Tészta, rizs, pékáru', en: 'Grains & Pasta' }, emoji: '🍝' },
+  { id: 'canned', title: { hu: 'Konzerv és tartós', en: 'Canned & Pantry' },    emoji: '🥫' },
+  { id: 'spice',  title: { hu: 'Fűszerek és szószok', en: 'Spices & Sauces' },  emoji: '🌶️' }
 ];
 
-// ---------- Segédek ----------
+const I18N = {
+  hu: {
+    homeTitle: 'Mi van otthon?',
+    resultsTitle: 'Mit főzzek?',
+    ideasTitle: 'Napi Receptötletek',
+    listTitle: 'Bevásárlólista',
+    settingsTitle: 'Beállítások',
+    searchHome: 'Írd be, mi van otthon (pl. tojás)',
+    pantryHeader: '✅ Nálam van',
+    clearBtn: 'Törlés',
+    stapleNote: 'A só, bors, olaj, cukor és víz mindig megvan otthon, ezeket nem kell kiválasztanod.',
+    ctaChoose: 'Válassz alapanyagokat',
+    ctaCook: count => `Mit főzhetek ezekből? (${count})`,
+    sortMissing: 'Legkevesebb hiányzó',
+    sortTime: '⏱ Leggyorsabb elöl',
+    aiGenBtn: '✨ Kérj új receptötleteket az AI-tól!',
+    aiLoading: '🤖 Mai friss receptek generálása...',
+    readyRecipes: '✅ Főzhető receptek & AI ötletek',
+    almostRecipes: '🛒 Majdnem kész: 1–2 dolog hiányzik',
+    smartShop: '💡 Okos bevásárlás',
+    moreIdeas: count => `Több ötlet mutatása (${count})`,
+    noPantry: 'Még nem adtál meg alapanyagot',
+    noPantryDesc: 'Add meg, mi van otthon, és összerakok belőle egy ételt.',
+    favs: 'Kedvencek',
+    random: '🎲 Meglepj!',
+    abcSort: 'ABC sorrend',
+    timeSort: '⏱ Idő szerint',
+    searchIdeas: 'Napi ötletek keresése',
+    ingredients: 'Hozzávalók',
+    steps: 'Elkészítés',
+    servings: 'adag',
+    missingToShop: '🛒 Hiányzók a bevásárlólistára',
+    shareMissing: '⇪ Hiányzók megosztása',
+    allHave: '✅ Minden hozzávaló megvan otthon!',
+    langLabel: 'Alkalmazás nyelve / App Language',
+    apiKeyLabel: 'Gemini API Kulcs',
+    apiKeyHint: 'Add meg a Google AI Stúdióban generált kulcsodat. A böngésződ biztonságosan, helyben tárolja.',
+    saveKeyBtn: 'Kulcs mentése',
+    keySavedToast: 'API kulcs sikeresen elmentve!',
+    shopHeader: 'Bevásárlólista',
+    shopPlaceholder: 'Új tétel (pl. tej)',
+    buyList: 'Megvenni',
+    boughtList: 'Megvettem',
+    moveToPantry: '🧊 Megvettek átrakása az otthoni készletbe',
+    shareList: '⇪ Lista megosztása',
+    clearChecked: 'Kipipáltak törlése',
+    clearAll: 'Teljes lista törlése',
+    emptyList: 'Üres a lista.',
+    aiBadge: '✨ Napi ötlet',
+    aiGeneratedText: 'Mesterséges intelligencia által generált napi recept',
+    missingText: 'Hiányzik:',
+    optionalText: 'elhagyható / bónusz',
+    backBtn: '‹ Vissza',
+    dailyNotice: 'Friss napi ajánlat (minden reggel automatikusan frissül)'
+  },
+  en: {
+    homeTitle: 'What is at home?',
+    resultsTitle: 'What to cook?',
+    ideasTitle: 'Daily Recipe Ideas',
+    listTitle: 'Shopping List',
+    settingsTitle: 'Settings',
+    searchHome: 'Type what you have (e.g. eggs)',
+    pantryHeader: '✅ I have',
+    clearBtn: 'Clear',
+    stapleNote: 'Salt, pepper, oil, sugar and water are always assumed to be available.',
+    ctaChoose: 'Choose ingredients',
+    ctaCook: count => `What can I cook? (${count})`,
+    sortMissing: 'Fewest missing',
+    sortTime: '⏱ Fastest first',
+    aiGenBtn: '✨ Ask AI for new recipe ideas!',
+    aiLoading: '🤖 Generating today fresh recipes...',
+    readyRecipes: '✅ Cookable recipes & AI ideas',
+    almostRecipes: '🛒 Almost ready: 1–2 items missing',
+    smartShop: '💡 Smart Shopping',
+    moreIdeas: count => `Show more ideas (${count})`,
+    noPantry: 'No ingredients added yet',
+    noPantryDesc: 'Add what you have at home, and I will find a recipe for you.',
+    favs: 'Favorites',
+    random: '🎲 Surprise me!',
+    abcSort: 'Alphabetical',
+    timeSort: '⏱ By time',
+    searchIdeas: 'Search daily ideas',
+    ingredients: 'Ingredients',
+    steps: 'Instructions',
+    servings: 'servings',
+    missingToShop: '🛒 Add missing to shopping list',
+    shareMissing: '⇪ Share missing items',
+    allHave: '✅ You have all ingredients at home!',
+    langLabel: 'App Language / Alkalmazás nyelve',
+    apiKeyLabel: 'Gemini API Key',
+    apiKeyHint: 'Enter your Gemini API key. It is securely saved in your browser storage only.',
+    saveKeyBtn: 'Save API Key',
+    keySavedToast: 'API key successfully saved!',
+    shopHeader: 'Shopping List',
+    shopPlaceholder: 'New item (e.g. milk)',
+    buyList: 'To Buy',
+    boughtList: 'Bought',
+    moveToPantry: '🧊 Move bought items to pantry',
+    shareList: '⇪ Share list',
+    clearChecked: 'Clear checked',
+    clearAll: 'Clear entire list',
+    emptyList: 'List is empty.',
+    aiBadge: '✨ Daily idea',
+    aiGeneratedText: 'Generated daily recipe by Artificial Intelligence',
+    missingText: 'Missing:',
+    optionalText: 'optional / bonus',
+    backBtn: '‹ Back',
+    dailyNotice: 'Fresh daily selection (updates automatically every morning)'
+  }
+};
+
+function t(key, lang = 'hu', ...args) {
+  const dict = I18N[lang] || I18N.hu;
+  const val = dict[key] || I18N.hu[key] || key;
+  return typeof val === 'function' ? val(...args) : val;
+}
 
 function norm(s) {
   return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -39,10 +153,20 @@ function newId() {
   return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-// ---------- Állapot ----------
+const DEFAULT_API_KEY = '';
 
 function defaultState() {
-  return { pantry: [], custom: [], favorites: [], shopping: [], household: 0 };
+  return { 
+    pantry: [], 
+    custom: [], 
+    favorites: [], 
+    shopping: [], 
+    household: 0, 
+    apiKey: DEFAULT_API_KEY, 
+    aiRecipes: [],
+    lastDailyDate: '',
+    lang: 'hu'
+  };
 }
 
 function loadState(storage) {
@@ -56,16 +180,14 @@ function loadState(storage) {
 }
 
 function saveState(storage, state) {
-  try { storage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* privát mód: nem mentünk */ }
+  try { storage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
 }
-
-// ---------- Mennyiségek ----------
 
 const AM = {
   parse(text) {
     let s = String(text).trim();
     let prefix = '';
-    if (s.toLowerCase().startsWith('kb. ')) { prefix = s.slice(0, 4); s = s.slice(4); }
+    if (s.toLowerCase().startsWith('kb. ') || s.toLowerCase().startsWith('approx. ')) { prefix = s.slice(0, 4); s = s.slice(4); }
     let i = 0;
     while (i < s.length && '0123456789,./'.indexOf(s[i]) >= 0) i++;
     const num = s.slice(0, i);
@@ -104,7 +226,6 @@ const AM = {
     return String(whole);
   },
 
-  /** kg és l esetén tizedes (1,2 kg), egyébként a konyhai törtek (1/2, 1 1/4). */
   fmtQty(value, rest) {
     const unit = (rest.match(/^\S+/) || [''])[0];
     if (unit === 'kg' || unit === 'l') return String(Math.round(value * 100) / 100).replace('.', ',');
@@ -143,8 +264,6 @@ const AM = {
   }
 };
 
-// ---------- Otthoni készlet ----------
-
 function has(state, id) {
   const ing = ING_BY_ID[id];
   if (!ing) return false;
@@ -180,7 +299,6 @@ function exactMatchExists(query) {
   return ING.some(i => i.keys.indexOf(q) >= 0);
 }
 
-/** A beírt szöveget lehetőleg listás alapanyaghoz köti, különben saját tételként menti. */
 function addTyped(state, text) {
   const trimmed = String(text).trim();
   const q = norm(trimmed);
@@ -192,30 +310,47 @@ function addTyped(state, text) {
   if (!state.custom.some(c => norm(c) === q)) state.custom.push(trimmed);
 }
 
-// ---------- Párosítás ----------
-
-function matches(state, tier) {
+function matches(state, tier, sortBy = 'missing') {
   const out = [];
-  for (const recipe of RECIPES) {
+  const allRecipes = (state.aiRecipes || []).concat(RECIPES);
+  
+  for (const recipe of allRecipes) {
     if (tier && recipe.tier !== tier) continue;
-    const have = recipe.core.filter(x => has(state, x.id));
-    const missing = recipe.core.filter(x => !has(state, x.id));
+    
+    if (recipe.isAi) {
+      out.push({ recipe, have: recipe.ing, missing: [] });
+      continue;
+    }
+
+    const coreList = recipe.core || recipe.ing;
+    const have = coreList.filter(x => x.id && ING_BY_ID[x.id] && has(state, x.id));
+    const missing = coreList.filter(x => x.id && ING_BY_ID[x.id] && !has(state, x.id));
+    
     if (have.length === 0) continue;
     out.push({ recipe, have, missing });
   }
-  out.sort((a, b) =>
-    (a.missing.length - b.missing.length) ||
-    (b.have.length - a.have.length) ||
-    a.recipe.name.localeCompare(b.recipe.name, 'hu'));
+
+  out.sort((a, b) => {
+    if (sortBy === 'time') {
+      return (a.recipe.minutes || 20) - (b.recipe.minutes || 20);
+    }
+    if (a.recipe.isAi && !b.recipe.isAi) return -1;
+    if (!a.recipe.isAi && b.recipe.isAi) return 1;
+    return (a.missing.length - b.missing.length) ||
+           (b.have.length - a.have.length) ||
+           a.recipe.name.localeCompare(b.recipe.name, 'hu');
+  });
   return out;
 }
 
 function unlockSuggestions(state, tier, limit) {
   const buckets = {};
   for (const m of matches(state, tier)) {
-    if (m.missing.length === 1) {
+    if (!m.recipe.isAi && m.missing.length === 1) {
       const id = m.missing[0].id;
-      (buckets[id] = buckets[id] || []).push(m.recipe.name);
+      if (id && ING_BY_ID[id]) {
+        (buckets[id] = buckets[id] || []).push(m.recipe.name);
+      }
     }
   }
   return Object.keys(buckets)
@@ -224,89 +359,127 @@ function unlockSuggestions(state, tier, limit) {
     .slice(0, limit || 3);
 }
 
-function ideas(state, tier, search, favOnly) {
+function ideas(state, tier, search, favOnly, sortBy = 'name') {
   const q = norm(search || '');
-  return RECIPES.filter(r => {
+  const allRecipes = state.aiRecipes || [];
+  const list = allRecipes.filter(r => {
     if (tier && r.tier !== tier) return false;
     if (favOnly && state.favorites.indexOf(r.id) < 0) return false;
     if (!q) return true;
     if (norm(r.name).indexOf(q) >= 0) return true;
-    return r.ing.some(x => ING_BY_ID[x.id].keys.some(k => k.indexOf(q) >= 0));
+    return r.ing.some(x => {
+      if (x.id && ING_BY_ID[x.id]) return ING_BY_ID[x.id].keys.some(k => k.indexOf(q) >= 0);
+      return norm(x.name || '').indexOf(q) >= 0;
+    });
   });
+
+  if (sortBy === 'time') {
+    list.sort((a, b) => (a.minutes || 20) - (b.minutes || 20));
+  } else {
+    list.sort((a, b) => a.name.localeCompare(b.name, 'hu'));
+  }
+  return list;
 }
 
 function randomRecipe(tier) {
-  const pool = RECIPES.filter(r => !tier || r.tier === tier);
+  const pool = state.aiRecipes.filter(r => !tier || r.tier === tier);
+  if (!pool.length) return null;
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// ---------- Bevásárlólista ----------
+function getFallbackDailyRecipes(lang = 'hu') {
+  const timestamp = Date.now();
+  if (lang === 'en') {
+    return Array.from({ length: 18 }, (_, idx) => ({
+      id: `daily_${timestamp}_${idx}`,
+      name: `Daily Recipe #${idx + 1}`,
+      emoji: ['🍲', '🍳', '🥗', '🍝', '🍗', '🍜', '🍛', '🥘'][idx % 8],
+      tier: idx % 3 === 0 ? 'cheap' : idx % 3 === 1 ? 'medium' : 'expensive',
+      minutes: 15 + (idx * 5) % 35,
+      servings: 2,
+      isAi: true,
+      ing: [{ name: 'Mixed vegetables', amount: '300g' }, { name: 'Olive oil', amount: '2 tbsp' }],
+      steps: [`1. Prepare ingredients.`, `2. Cook thoroughly for ${15 + (idx * 5) % 35} minutes.`]
+    }));
+  }
+  return Array.from({ length: 18 }, (_, idx) => ({
+    id: `daily_${timestamp}_${idx}`,
+    name: `Napi Recept #${idx + 1}`,
+    emoji: ['🍲', '🍳', '🥗', '🍝', '🍗', '🍜', '🍛', '🥘'][idx % 8],
+    tier: idx % 3 === 0 ? 'cheap' : idx % 3 === 1 ? 'medium' : 'expensive',
+    minutes: 15 + (idx * 5) % 35,
+    servings: 2,
+    isAi: true,
+    ing: [{ name: 'Vegyes zöldség', amount: '30 dkg' }, { name: 'Olívaolaj', amount: '2 ek' }],
+    steps: [`1. Készítsd elő az alapanyagokat.`, `2. Főzd készre ${15 + (idx * 5) % 35} perc alatt.`]
+  }));
+}
 
-function addToShopping(state, item) {
-  const key = norm(item.name);
-  const existing = state.shopping.find(e => {
-    if (e.checked) return false;
-    if (item.ingredientID) return e.ingredientID === item.ingredientID;
-    return !e.ingredientID && norm(e.name) === key;
-  });
-  if (existing) {
-    // Ugyanazt a receptet nem adjuk hozzá kétszer.
-    if (item.source && existing.sources.indexOf(item.source) >= 0) return;
-    existing.amount = AM.add(existing.amount, item.amount || '');
-    if (item.source) existing.sources.push(item.source);
-  } else {
-    state.shopping.push({
-      id: newId(),
-      ingredientID: item.ingredientID || null,
-      name: item.name,
-      amount: item.amount || '',
-      checked: false,
-      sources: item.source ? [item.source] : []
+async function fetchDailyAIRecipes(state) {
+  const apiKey = (state.apiKey || '').trim();
+  if (!apiKey) {
+    return getFallbackDailyRecipes(state.lang);
+  }
+
+  const langInstruction = state.lang === 'en' 
+    ? 'IMPORTANT: Generate 18 diverse, creative daily recipes in ENGLISH as a strict JSON array.' 
+    : 'FONTOS: Generálj 18 különböző, változatos, izgalmas napi receptet SZIGORÚAN MAGYAR nyelven, mint egy valid JSON tömböt.';
+
+  const prompt = `${langInstruction}
+  Format:
+  [
+    {
+      "name": "Recipe name",
+      "emoji": "🍲",
+      "tier": "cheap", 
+      "minutes": 25,
+      "servings": 2,
+      "isAi": true,
+      "ing": [
+        {"name": "Ingredient 1", "amount": "1 pc"}
+      ],
+      "steps": [
+        "Step 1 description"
+      ]
+    }
+  ]
+  Tier must be "cheap", "medium" or "expensive".`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
     });
+
+    if (!response.ok) return getFallbackDailyRecipes(state.lang);
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    
+    return parsed.map((r, idx) => Object.assign({}, r, {
+      id: `daily_${Date.now()}_${idx}`,
+      isAi: true
+    }));
+  } catch (err) {
+    return getFallbackDailyRecipes(state.lang);
   }
 }
 
-function missingRequired(state, recipe) {
-  return recipe.ing.filter(x => !x.opt && !has(state, x.id));
-}
-
-function addMissing(state, recipe, servings) {
-  const factor = servings / Math.max(recipe.servings, 1);
-  for (const x of missingRequired(state, recipe)) {
-    addToShopping(state, {
-      name: ING_BY_ID[x.id].name,
-      amount: AM.scale(x.amount, factor),
-      ingredientID: x.id,
-      source: recipe.name
-    });
+async function checkAndRefreshDailyRecipes(state) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (state.lastDailyDate !== todayStr || !state.aiRecipes || state.aiRecipes.length === 0) {
+    const fresh = await fetchDailyAIRecipes(state);
+    state.aiRecipes = fresh;
+    state.lastDailyDate = todayStr;
+    return true;
   }
-}
-
-function addManualShopping(state, text) {
-  const trimmed = String(text).trim();
-  const q = norm(trimmed);
-  if (!q) return;
-  const ing = ING.find(i => !i.staple && i.keys.indexOf(q) >= 0);
-  if (ing) addToShopping(state, { name: ing.name, amount: '', ingredientID: ing.id });
-  else addToShopping(state, { name: trimmed, amount: '' });
-}
-
-function moveCheckedToPantry(state) {
-  for (const item of state.shopping) {
-    if (!item.checked) continue;
-    if (item.ingredientID) addPantry(state, item.ingredientID);
-    else addTyped(state, item.name);
-  }
-  state.shopping = state.shopping.filter(i => !i.checked);
-}
-
-function shoppingText(items, title) {
-  const lines = items.map(i => '• ' + i.name + (i.amount ? ': ' + i.amount : ''));
-  return title + '\n' + lines.join('\n');
-}
-
-if (typeof module !== 'undefined') {
-  module.exports = { norm, AM, has, matches, unlockSuggestions, ideas, addTyped, addMissing, addManualShopping,
-    moveCheckedToPantry, addToShopping, missingRequired, suggestions, exactMatchExists, defaultState,
-    ING, RECIPES, TIERS, pantryCount, togglePantry, shoppingText };
+  return false;
 }

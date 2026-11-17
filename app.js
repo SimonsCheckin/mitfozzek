@@ -145,7 +145,6 @@ function resultsView() {
     <button class="${ui.sortBy === 'time' ? 'active' : ''}" data-act="sort" data-v="time">${t('sortTime', state.lang)}</button>
   </div>`;
 
-  // ITT VAN VISSZA A GOMB: AI KITALÁLÁS AZ ALAPANYAGOKBÓL
   html += `<div style="margin: 14px 0;">
     <button class="primary wide" data-act="generateCustomAI" ${ui.customAiLoading ? 'disabled' : ''}>
       ${ui.customAiLoading ? t('aiLoading', state.lang) : t('aiGenBtn', state.lang)}
@@ -194,7 +193,9 @@ function ideasView() {
     <div id="ideaList">${ideaListHTML()}</div>`;
 }
 
+// JAVÍTVA: BÁRMILYEN RECEPTET MEGTALÁL (STATIKUS ÉS AI IS)
 function findRecipeAnywhere(id) {
+  if (RECIPE_BY_ID[id]) return RECIPE_BY_ID[id];
   if (state.aiRecipes) {
     const found = state.aiRecipes.find(r => r.id === id);
     if (found) return found;
@@ -210,9 +211,19 @@ function detailView() {
   const fav = state.favorites.indexOf(r.id) >= 0;
 
   const rows = r.ing.map(x => {
-    return `<div class="ingrow"><span class="ok">🍲</span>
-      <span class="grow">${esc(x.name)}</span>
-      <span class="muted amount">${esc(AM ? AM.scale(x.amount, factor) : x.amount)}</span></div>`;
+    let emoji = '🍲';
+    let name = x.name;
+    let have = true;
+    if (x.id && ING_BY_ID[x.id]) {
+      const ing = ING_BY_ID[x.id];
+      emoji = ing.emoji;
+      name = ing.name;
+      have = has(state, x.id);
+    }
+    const icon = r.isAi ? '<span class="ok">✨</span>' : (have ? '<span class="ok">✔</span>' : x.opt ? '<span class="muted">◌</span>' : '<span class="warn">🛒</span>');
+    return `<div class="ingrow">${icon}
+      <span class="grow">${emoji} ${esc(name)}</span>
+      <span class="muted amount">${esc(AM.scale(x.amount, factor))}</span></div>`;
   }).join('');
 
   return `<div class="detailbar"><button class="link" data-act="back">${t('backBtn', state.lang)}</button>
@@ -228,7 +239,7 @@ function detailView() {
         <span><button data-act="srv" data-d="-1" ${ui.servings <= 1 ? 'disabled' : ''}>−</button>
         <button data-act="srv" data-d="1" ${ui.servings >= 12 ? 'disabled' : ''}>+</button></span></div>
       <div class="ings">${rows}</div>
-      <p class="ok">✨ ${t('aiGeneratedText', state.lang)}</p>
+      ${r.isAi ? `<p class="ok">✨ ${t('aiGeneratedText', state.lang)}</p>` : ''}
 
       <h2>${t('steps', state.lang)}</h2>
       <ol class="steps">${r.steps.map(s => `<li><span class="num"></span><span>${esc(s)}</span></li>`).join('')}</ol>

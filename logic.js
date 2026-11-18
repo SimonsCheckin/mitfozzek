@@ -1,6 +1,6 @@
 'use strict';
 
-const KEY = 'mitfozzek.v9';
+const KEY = 'mitfozzek.v10';
 
 const TIERS = {
   cheap:     { title: { hu: 'Olcsó', en: 'Cheap' },   dots: '●○○', hint: { hu: 'kb. 700 Ft/adag alatt', en: 'under ~$2/portion' },     color: '#16a34a' },
@@ -159,7 +159,8 @@ function defaultState() {
   return { 
     pantry: [], 
     custom: [], 
-    favorites: [], 
+    favorites: [],      // ID-k listája
+    favoriteRecipes: [], // Mentett teljes recept objektumok, hogy soha ne tűnjenek el!
     shopping: [], 
     household: 0, 
     apiKey: DEFAULT_API_KEY, 
@@ -173,7 +174,9 @@ function loadState(storage) {
   try {
     const raw = storage.getItem(KEY);
     if (!raw) return defaultState();
-    return Object.assign(defaultState(), JSON.parse(raw));
+    const parsed = Object.assign(defaultState(), JSON.parse(raw));
+    if (!parsed.favoriteRecipes) parsed.favoriteRecipes = [];
+    return parsed;
   } catch (e) {
     return defaultState();
   }
@@ -361,10 +364,11 @@ function unlockSuggestions(state, tier, limit) {
 
 function ideas(state, tier, search, favOnly, sortBy = 'name') {
   const q = norm(search || '');
-  const allRecipes = state.aiRecipes || [];
-  const list = allRecipes.filter(r => {
+  // Ha a kedvenc nézet van bekapcsolva, a elmentett receptekből szűrünk, különben a napi AI receptekből
+  const sourcePool = favOnly ? (state.favoriteRecipes || []) : (state.aiRecipes || []);
+  
+  const list = sourcePool.filter(r => {
     if (tier && r.tier !== tier) return false;
-    if (favOnly && state.favorites.indexOf(r.id) < 0) return false;
     if (!q) return true;
     if (norm(r.name).indexOf(q) >= 0) return true;
     return r.ing.some(x => norm(x.name || '').indexOf(q) >= 0);
@@ -447,24 +451,20 @@ function shoppingText(items, title) {
   return title + '\n' + lines.join('\n');
 }
 
-// 5 OLCSÓ, 5 KÖZEPES ÉS 5 DRÁGA TARTALÉK RECEPT (ÖSSZESEN 15 DB)
 function getFallbackDailyRecipes(lang = 'hu') {
   const timestamp = Date.now();
   if (lang === 'en') {
     return [
-      // 5 Cheap
       { id: `daily_${timestamp}_c1`, name: 'Traditional Cottage Cheese Noodles', emoji: '🍝', tier: 'cheap', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Pasta', amount: '350g' }, { name: 'Cottage cheese', amount: '250g' }, { name: 'Bacon', amount: '150g' }, { name: 'Sour cream', amount: '200g' }], steps: ['1. Cook pasta.', '2. Fry bacon.', '3. Mix with cottage cheese and sour cream.'] },
       { id: `daily_${timestamp}_c2`, name: 'Garlic Potato Cream Soup', emoji: '🍲', tier: 'cheap', minutes: 25, servings: 4, isAi: true, ing: [{ name: 'Potatoes', amount: '600g' }, { name: 'Garlic', amount: '4 cloves' }, { name: 'Broth', amount: '1l' }, { name: 'Bread croutons', amount: '1 cup' }], steps: ['1. Boil potatoes and garlic in broth.', '2. Blend until smooth.', '3. Serve with croutons.'] },
       { id: `daily_${timestamp}_c3`, name: 'Classic Fried Eggs with Tomato Salad', emoji: '🍳', tier: 'cheap', minutes: 15, servings: 2, isAi: true, ing: [{ name: 'Eggs', amount: '4 pcs' }, { name: 'Tomatoes', amount: '3 pcs' }, { name: 'Onion', amount: '1 pc' }], steps: ['1. Fry eggs sunny side up.', '2. Slice tomatoes and onions for salad.', '3. Serve together.'] },
       { id: `daily_${timestamp}_c4`, name: 'Semolina Porridge with Cocoa', emoji: '🥣', tier: 'cheap', minutes: 10, servings: 2, isAi: true, ing: [{ name: 'Milk', amount: '5dl' }, { name: 'Semolina', amount: '4 tbsp' }, { name: 'Sugar', amount: '2 tbsp' }, { name: 'Cocoa powder', amount: '1 tbsp' }], steps: ['1. Heat milk and whisk in semolina and sugar.', '2. Cook until thick.', '3. Dust with cocoa powder.'] },
       { id: `daily_${timestamp}_c5`, name: 'Butter and Cheese Toast', emoji: '🍞', tier: 'cheap', minutes: 10, servings: 2, isAi: true, ing: [{ name: 'Bread', amount: '4 slices' }, { name: 'Butter', amount: '50g' }, { name: 'Cheese', amount: '100g' }], steps: ['1. Butter bread slices.', '2. Top with grated cheese.', '3. Bake in oven until melted.'] },
-      // 5 Medium
       { id: `daily_${timestamp}_m1`, name: 'Creamy Garlic Chicken Breast with Rice', emoji: '🍗', tier: 'medium', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Chicken breast', amount: '500g' }, { name: 'Garlic', amount: '3 cloves' }, { name: 'Heavy cream', amount: '2 dl' }, { name: 'Rice', amount: '250g' }], steps: ['1. Cook rice.', '2. Sauté chicken breast.', '3. Add garlic and heavy cream, simmer until thick.'] },
       { id: `daily_${timestamp}_m2`, name: 'Classic Bolognese Spaghetti', emoji: '🍝', tier: 'medium', minutes: 40, servings: 4, isAi: true, ing: [{ name: 'Ground beef', amount: '500g' }, { name: 'Tomato paste', amount: '700g' }, { name: 'Spaghetti', amount: '400g' }], steps: ['1. Brown ground beef.', '2. Add tomato sauce and simmer.', '3. Serve with spaghetti.'] },
       { id: `daily_${timestamp}_m3`, name: 'Crispy Chicken Caesar Salad', emoji: '🥗', tier: 'medium', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Romaine lettuce', amount: '1 head' }, { name: 'Chicken breast', amount: '300g' }, { name: 'Parmesan', amount: '60g' }], steps: ['1. Grill chicken breast.', '2. Toss lettuce with dressing.', '3. Top with chicken and parmesan.'] },
       { id: `daily_${timestamp}_m4`, name: 'Pan-Seared Pork Chops with Mashed Potatoes', emoji: '🥩', tier: 'medium', minutes: 35, servings: 2, isAi: true, ing: [{ name: 'Pork chops', amount: '2 pcs' }, { name: 'Potatoes', amount: '600g' }, { name: 'Butter', amount: '40g' }], steps: ['1. Fry pork chops until tender.', '2. Mash boiled potatoes with butter and milk.', '3. Serve hot.'] },
       { id: `daily_${timestamp}_m5`, name: 'Creamy Mushroom Pasta', emoji: '🍝', tier: 'medium', minutes: 25, servings: 2, isAi: true, ing: [{ name: 'Mushrooms', amount: '400g' }, { name: 'Pasta', amount: '300g' }, { name: 'Cooking cream', amount: '2 dl' }], steps: ['1. Sauté sliced mushrooms.', '2. Add cream and simmer.', '3. Toss with cooked pasta.'] },
-      // 5 Expensive
       { id: `daily_${timestamp}_e1`, name: 'Pan-Seared Salmon with Lemon Butter Sauce', emoji: '🐟', tier: 'expensive', minutes: 25, servings: 2, isAi: true, ing: [{ name: 'Salmon fillet', amount: '500g' }, { name: 'Lemon', amount: '1 pc' }, { name: 'Butter', amount: '50g' }, { name: 'Asparagus', amount: '300g' }], steps: ['1. Sear salmon skin-side down.', '2. Steam asparagus.', '3. Make lemon butter sauce and drizzle over.'] },
       { id: `daily_${timestamp}_e2`, name: 'Beef Tenderloin Steak with Pepper Sauce', emoji: '🥩', tier: 'expensive', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Beef steak', amount: '400g' }, { name: 'Green peppercorns', amount: '2 tbsp' }, { name: 'Heavy cream', amount: '1.5 dl' }, { name: 'Brandy', amount: '1 shot' }], steps: ['1. Sear steak to preferred doneness.', '2. Deglaze pan with brandy and cream, add peppercorns.', '3. Serve steak with sauce.'] },
       { id: `daily_${timestamp}_e3`, name: 'Shrimp Scampi with Garlic and White Wine', emoji: '🦐', tier: 'expensive', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Shrimp', amount: '400g' }, { name: 'White wine', amount: '1 dl' }, { name: 'Garlic', amount: '4 cloves' }, { name: 'Pasta', amount: '250g' }], steps: ['1. Sauté garlic and shrimp.', '2. Pour in white wine and reduce.', '3. Toss with cooked pasta.'] },
@@ -473,24 +473,21 @@ function getFallbackDailyRecipes(lang = 'hu') {
     ];
   }
   return [
-    // 5 Olcsó
     { id: `daily_${timestamp}_c1`, name: 'Hagyományos túrós csusza piritott szalonnával', emoji: '🍝', tier: 'cheap', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Kockatészta', amount: '35 dkg' }, { name: 'Tehéntúró', amount: '25 dkg' }, { name: 'Szalonna', amount: '15 dkg' }, { name: 'Tejföl', amount: '20 dkg' }], steps: ['1. Főzd ki a tésztát.', '2. Pirítsd meg a szalonnát.', '3. Keverd össze túróval, tejföllel és a szalonnával.'] },
-    { id: `daily_${timestamp}_c2`, name: 'Hagymás-krumplis tojásos lecsó', emoji: '🍳', tier: 'cheap', minutes: 25, servings: 3, isAi: true, ing: [{ name: 'Krumpli', amount: '50 dkg' }, { name: 'Tojás', amount: '4 db' }, { name: 'Hagyma', amount: '2 db' }], steps: ['1. Dinszteld meg a hagymát.', '2. Add hozzá a kockázott krumplit és pirítsd meg.', '3. Üsd rá a tojásokat és keverd készre.'] },
-    { id: `daily_${timestamp}_c3`, name: 'Tejfölös-fokhagymás tészta', emoji: '🍝', tier: 'cheap', minutes: 15, servings: 2, isAi: true, ing: [{ name: 'Spagetti', amount: '30 dkg' }, { name: 'Tejföl', amount: '2 dl' }, { name: 'Fokhagyma', amount: '2 gerezd' }, { name: 'Sajt', amount: '10 dkg' }], steps: ['1. Főzd ki a tésztát.', '2. Keverd össze a zúzott fokhagymás tejföllel.', '3. Szórd meg reszelt sajttal.'] },
-    { id: `daily_${timestamp}_c4`, name: 'Kakaós darás tészta', emoji: '🍝', tier: 'cheap', minutes: 15, servings: 2, isAi: true, ing: [{ name: 'Száraztészta', amount: '30 dkg' }, { name: 'Búzadara', amount: '10 dkg' }, { name: 'Kakaópor', amount: '3 ek' }, { name: 'Cukor', amount: '3 ek' }], steps: ['1. Főzd ki a tésztát.', '2. Pirítsd meg a darát kevés olajon, öntsd fel vízzel és főzd meg.', '3. Keverd össze a tésztával és szórd meg kakaóval.'] },
-    { id: `daily_${timestamp}_c5`, name: 'Sajtos-majonézes melegszendvics', emoji: '🥪', tier: 'cheap', minutes: 10, servings: 2, isAi: true, ing: [{ name: 'Kenyér', amount: '4 szelet' }, { name: 'Sajt', amount: '10 dkg' }, { name: 'Majonéz', amount: '2 ek' }, { name: 'Sonka', amount: '5 dkg' }], steps: ['1. Keverd össze a reszelt sajtot a majonézzel és a sonkával.', '2. Halmozd a kenyérre.', '3. Süsd meg sütőben.'] },
-    // 5 Közepes
-    { id: `daily_${timestamp}_m1`, name: 'Tejszínes-fokhagymás csirkemell rizzsel', emoji: '🍗', tier: 'medium', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Csirkemell', amount: '50 dkg' }, { name: 'Fokhagyma', amount: '3 gerezd' }, { name: 'Főzőtejszín', amount: '2 dl' }, { name: 'Rizs', amount: '20 dkg' }], steps: ['1. Készítsd el a rizst.', '2. Pirítsd meg a csirkemellet.', '3. Öntsd fel tejszínnel és fokhagymával, majd sűrítsd be.'] },
-    { id: `daily_${timestamp}_m2`, name: 'Klasszikus spagetti Bolognai módra', emoji: '🍝', tier: 'medium', minutes: 40, servings: 4, isAi: true, ing: [{ name: 'Darált hús', amount: '50 dkg' }, { name: 'Paradicsompüré', amount: '700 g' }, { name: 'Spagetti', amount: '40 dkg' }], steps: ['1. Pirítsd meg a darált húst.', '2. Add hozzá a paradicsompürét és fűszerezd.', '3. Főzd össze és tálald spagettivel.'] },
-    { id: `daily_${timestamp}_m3`, name: 'Ropogós Cézár saláta csirkével', emoji: '🥗', tier: 'medium', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Római saláta', amount: '1 fej' }, { name: 'Csirkemell', amount: '30 dkg' }, { name: 'Parmezán', amount: '6 dkg' }], steps: ['1. Grillezd meg a csirkét.', '2. Keverd össze a salátát öntettel.', '3. Halmozd rá a húst és sajtot.'] },
-    { id: `daily_${timestamp}_m4`, name: 'Brassói aprópecsenye sült krumplival', emoji: '🥩', tier: 'medium', minutes: 45, servings: 3, isAi: true, ing: [{ name: 'Sertéscomb', amount: '60 dkg' }, { name: 'Krumpli', amount: '80 dkg' }, { name: 'Fokhagyma', amount: '4 gerezd' }], steps: ['1. Vágd apróra és pirítsd meg a húst fokhagymával.', '2. Süsd meg a krumplit.', '3. Keverd össze a kettőt.'] },
-    { id: `daily_${timestamp}_m5`, name: 'Tejszínes gombás csirkeragu', emoji: '🍄', tier: 'medium', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Gomba', amount: '40 dkg' }, { name: 'Csirkemell', amount: '40 dkg' }, { name: 'Tejszín', amount: '2 dl' }], steps: ['1. Pirítsd meg a csirkét és a gombát.', '2. Öntsd fel tejszínnel.', '3. Főzd sűrűre.'] },
-    // 5 Drága
-    { id: `daily_${timestamp}_e1`, name: 'Vajas-citrusos sült lazac spárgával', emoji: '🐟', tier: 'expensive', minutes: 25, servings: 2, isAi: true, ing: [{ name: 'Lazacfilé', amount: '50 dkg' }, { name: 'Citrom', amount: '1 db' }, { name: 'Vaj', amount: '50 g' }, { name: 'Spárga', amount: '30 dkg' }], steps: ['1. Süsd meg a lazacot vajon.', '2. Párold meg a spárgát.', '3. Locsold meg citromos vajmártással.'] },
-    { id: `daily_${timestamp}_e2`, name: 'Bélszínsteak zöldborsmártással', emoji: '🥩', tier: 'expensive', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Bélszín', amount: '40 dkg' }, { name: 'Zöldbors', amount: '2 ek' }, { name: 'Tejszín', amount: '1.5 dl' }, { name: 'Konyak', amount: '1 adag' }], steps: ['1. Süsd meg a bélszínt.', '2. Készíts mártást konyakból, tejszínből és borsból.', '3. Tálald együtt.'] },
-    { id: `daily_${timestamp}_e3`, name: 'Fokhagymás-boros garnélarák tésztával', emoji: '🦐', tier: 'expensive', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Garnélarák', amount: '40 dkg' }, { name: 'Fehérbor', amount: '1 dl' }, { name: 'Fokhagyma', amount: '4 gerezd' }, { name: 'Tészta', amount: '25 dkg' }], steps: ['1. Pirítsd meg a fokhagymát és rákot.', '2. Öntsd fel borral és forrald össze.', '3. Forgasd bele a tésztába.'] },
-    { id: `daily_${timestamp}_e4`, name: 'Rozmaringos kacsamell narancsmártással', emoji: '🦆', tier: 'expensive', minutes: 40, servings: 2, isAi: true, ing: [{ name: 'Kacsamell', amount: '2 db' }, { name: 'Narancs', amount: '2 db' }, { name: 'Méz', amount: '2 ek' }], steps: ['1. Süsd ropogósra a kacsamell bőrét.', '2. Készíts narancsos-mézes mártást.', '3. Szeleteld fel és locsold meg.'] },
-    { id: `daily_${timestamp}_e5`, name: 'Szarvasolajos vargányás rizottó', emoji: '🍚', tier: 'expensive', minutes: 35, servings: 2, isAi: true, ing: [{ name: 'Rizottó rizs', amount: '250 g' }, { name: 'Vargánya gomba', amount: '200 g' }, { name: 'Szarvasgomba olaj', amount: '1 tk' }, { name: 'Parmezán', amount: '80 g' }], steps: ['1. Pirítsd meg a gombát és rizst.', '2. Fokozatosan adagold hozzá a alaplevet.', '3. Keverd bele a parmezánt és szarvasgomba olajat.'] }
+    { id: `daily_${timestamp}_c2`, name: 'Hagymás-krumplis tojásos lecsó', emoji: '🍳', tier: 'cheap', minutes: 25, servings: 3, isAi: true, ing: [{ name: 'Krumpli', amount: '50 dkg' }, { name: 'Tojás', amount: '4 db' }, { name: 'Hagyma', amount: '2 db' }], steps: ['1. Dinszteld meg a hagymát.', '2. Add hozzá a kockázott krumplit.', '3. Üsd rá a tojásokat.'] },
+    { id: `daily_${timestamp}_c3`, name: 'Tejfölös-fokhagymás tészta', emoji: '🍝', tier: 'cheap', minutes: 15, servings: 2, isAi: true, ing: [{ name: 'Spagetti', amount: '30 dkg' }, { name: 'Tejföl', amount: '2 dl' }, { name: 'Fokhagyma', amount: '2 gerezd' }, { name: 'Sajt', amount: '10 dkg' }], steps: ['1. Főzd ki a tésztát.', '2. Keverd össze tejföllel és fokhagymával.', '3. Szórd meg sajttal.'] },
+    { id: `daily_${timestamp}_c4`, name: 'Kakaós darás tészta', emoji: '🍝', tier: 'cheap', minutes: 15, servings: 2, isAi: true, ing: [{ name: 'Száraztészta', amount: '30 dkg' }, { name: 'Búzadara', amount: '10 dkg' }, { name: 'Kakaópor', amount: '3 ek' }], steps: ['1. Főzd ki a tésztát.', '2. Pirítsd meg a darát.', '3. Keverd össze kakaóval.'] },
+    { id: `daily_${timestamp}_c5`, name: 'Sajtos-majonézes melegszendvics', emoji: '🥪', tier: 'cheap', minutes: 10, servings: 2, isAi: true, ing: [{ name: 'Kenyér', amount: '4 szelet' }, { name: 'Sajt', amount: '10 dkg' }, { name: 'Majonéz', amount: '2 ek' }], steps: ['1. Keverd össze a sajtot majonézzel.', '2. Kend a kenyérre.', '3. Süsd meg.'] },
+    { id: `daily_${timestamp}_m1`, name: 'Tejszínes-fokhagymás csirkemell rizzsel', emoji: '🍗', tier: 'medium', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Csirkemell', amount: '50 dkg' }, { name: 'Fokhagyma', amount: '3 gerezd' }, { name: 'Főzőtejszín', amount: '2 dl' }, { name: 'Rizs', amount: '20 dkg' }], steps: ['1. Készítsd el a rizst.', '2. Pirítsd meg a csirkét.', '3. Öntsd fel tejszínnel.'] },
+    { id: `daily_${timestamp}_m2`, name: 'Klasszikus spagetti Bolognai módra', emoji: '🍝', tier: 'medium', minutes: 40, servings: 4, isAi: true, ing: [{ name: 'Darált hús', amount: '50 dkg' }, { name: 'Paradicsompüré', amount: '700 g' }, { name: 'Spagetti', amount: '40 dkg' }], steps: ['1. Pirítsd meg a húst.', '2. Add hozzá a paradicsompürét.', '3. Főzd össze.'] },
+    { id: `daily_${timestamp}_m3`, name: 'Ropogós Cézár saláta csirkével', emoji: '🥗', tier: 'medium', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Római saláta', amount: '1 fej' }, { name: 'Csirkemell', amount: '30 dkg' }, { name: 'Parmezán', amount: '6 dkg' }], steps: ['1. Grillezd meg a csirkét.', '2. Keverd össze a salátát.', '3. Szórd meg sajttal.'] },
+    { id: `daily_${timestamp}_m4`, name: 'Brassói aprópecsenye sült krumplival', emoji: '🥩', tier: 'medium', minutes: 45, servings: 3, isAi: true, ing: [{ name: 'Sertéscomb', amount: '60 dkg' }, { name: 'Krumpli', amount: '80 dkg' }], steps: ['1. Pirítsd meg a húst.', '2. Süsd meg a krumplit.', '3. Keverd össze.'] },
+    { id: `daily_${timestamp}_m5`, name: 'Tejszínes gombás csirkeragu', emoji: '🍄', tier: 'medium', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Gomba', amount: '40 dkg' }, { name: 'Csirkemell', amount: '40 dkg' }, { name: 'Tejszín', amount: '2 dl' }], steps: ['1. Pirítsd meg a húst és gombát.', '2. Öntsd fel tejszínnel.', '3. Főzd sűrűre.'] },
+    { id: `daily_${timestamp}_e1`, name: 'Vajas-citrusos sült lazac spárgával', emoji: '🐟', tier: 'expensive', minutes: 25, servings: 2, isAi: true, ing: [{ name: 'Lazacfilé', amount: '50 dkg' }, { name: 'Citrom', amount: '1 db' }, { name: 'Vaj', amount: '50 g' }, { name: 'Spárga', amount: '30 dkg' }], steps: ['1. Süsd meg a lazacot.', '2. Párold meg a spárgát.', '3. Locsold meg vajmártással.'] },
+    { id: `daily_${timestamp}_e2`, name: 'Bélszínsteak zöldborsmártással', emoji: '🥩', tier: 'expensive', minutes: 30, servings: 2, isAi: true, ing: [{ name: 'Bélszín', amount: '40 dkg' }, { name: 'Zöldbors', amount: '2 ek' }, { name: 'Tejszín', amount: '1.5 dl' }], steps: ['1. Süsd meg a steaket.', '2. Készíts zöldborsmártást.', '3. Tálald együtt.'] },
+    { id: `daily_${timestamp}_e3`, name: 'Fokhagymás-boros garnélarák tésztával', emoji: '🦐', tier: 'expensive', minutes: 20, servings: 2, isAi: true, ing: [{ name: 'Garnélarák', amount: '40 dkg' }, { name: 'Fehérbor', amount: '1 dl' }, { name: 'Fokhagyma', amount: '4 gerezd' }], steps: ['1. Pirítsd meg a rákot.', '2. Öntsd fel borral.', '3. Forgasd tésztába.'] },
+    { id: `daily_${timestamp}_e4`, name: 'Rozmaringos kacsamell narancsmártással', emoji: '🦆', tier: 'expensive', minutes: 40, servings: 2, isAi: true, ing: [{ name: 'Kacsamell', amount: '2 db' }, { name: 'Narancs', amount: '2 db' }], steps: ['1. Süsd ropogósra a kacsát.', '2. Készíts narancsmártást.', '3. Szeleteld fel.'] },
+    { id: `daily_${timestamp}_e5`, name: 'Szarvasolajos vargányás rizottó', emoji: '🍚', tier: 'expensive', minutes: 35, servings: 2, isAi: true, ing: [{ name: 'Rizottó rizs', amount: '250 g' }, { name: 'Vargánya', amount: '200 g' }, { name: 'Parmezán', amount: '80 g' }], steps: ['1. Pirítsd meg a gombát és rizst.', '2. Adagolj alaplevet.', '3. Keverd bele a parmezánt.'] }
   ];
 }
 
@@ -501,8 +498,8 @@ async function fetchDailyAIRecipes(state) {
   }
 
   const langInstruction = state.lang === 'en' 
-    ? 'IMPORTANT: Generate EXACTLY 15 diverse recipes in ENGLISH as a strict JSON array: exactly 5 cheap ("cheap"), 5 medium ("medium"), and 5 expensive ("expensive") recipes. Provide real dish names, precise ingredients, and 4-6 detailed steps.' 
-    : 'FONTOS: Generálj PONTOSAN 15 darab változatos receptet SZIGORÚAN MAGYAR nyelven, mint egy valid JSON tömböt. A 15 receptből PONTOSAN 5 legyen olcsó ("cheap"), 5 közepes ("medium"), és 5 drága ("expensive") árkategóriájú. Adj meg valós ételneveket, pontos hozzávalókat és 4-6 részletes lépést.';
+    ? 'IMPORTANT: Generate EXACTLY 15 diverse recipes in ENGLISH as a strict JSON array: exactly 5 cheap ("cheap"), 5 medium ("medium"), and 5 expensive ("expensive") recipes.' 
+    : 'FONTOS: Generálj PONTOSAN 15 darab változatos receptet SZIGORÚAN MAGYAR nyelven, mint egy valid JSON tömböt. Pontosan 5 olcsó ("cheap"), 5 közepes ("medium"), és 5 drága ("expensive") recept legyen.';
 
   const prompt = `${langInstruction}
   Format:
@@ -514,13 +511,8 @@ async function fetchDailyAIRecipes(state) {
       "minutes": 30,
       "servings": 4,
       "isAi": true,
-      "ing": [
-        {"name": "Hozzávaló 1", "amount": "50 dkg"}
-      ],
-      "steps": [
-        "1. lépés részletes leírása",
-        "2. lépés részletes leírása"
-      ]
+      "ing": [{"name": "Hozzávaló", "amount": "mennyiség"}],
+      "steps": ["1. lépés", "2. lépés"]
     }
   ]`;
 
@@ -563,7 +555,6 @@ async function checkAndRefreshDailyRecipes(state) {
   return false;
 }
 
-// AI RECEPT KITALÁLÁS AZ OTTHON LÉVŐ ALAPANYAGOKBÓL
 async function fetchCustomAIRecipe(state) {
   const ingredients = getAllIngredientsList(state);
   const apiKey = (state.apiKey || '').trim();
@@ -572,11 +563,11 @@ async function fetchCustomAIRecipe(state) {
   }
 
   const langInstruction = state.lang === 'en' 
-    ? `I have these ingredients at home: ${ingredients.join(', ')}. Create 1 wonderful, detailed, realistic recipe using these with clear steps.` 
-    : `Ezek az alapanyagok vannak otthon: ${ingredients.join(', ')}. Találj ki 1 finom, normális, valódi ételreceptet ezekből magyarul, pontos hozzávalókkal és részletes (4-6 lépéses) elkészítési útmutatóval.`;
+    ? `I have these ingredients at home: ${ingredients.join(', ')}. Create 1 wonderful, detailed, realistic recipe using these.` 
+    : `Ezek az alapanyagok vannak otthon: ${ingredients.join(', ')}. Találj ki 1 finom, normális, valódi ételreceptet ezekből magyarul.`;
 
   const prompt = `${langInstruction}
-  Return STRICTLY a valid JSON object (not array), format:
+  Return STRICTLY a valid JSON object, format:
   {
     "name": "Étel neve",
     "emoji": "🍳",
@@ -584,7 +575,7 @@ async function fetchCustomAIRecipe(state) {
     "minutes": 30,
     "servings": 2,
     "ing": [{"name": "Alapanyag", "amount": "mennyiség"}],
-    "steps": ["1. lépés leírása", "2. lépés leírása"]
+    "steps": ["1. lépés", "2. lépés"]
   }`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;

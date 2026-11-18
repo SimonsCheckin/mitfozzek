@@ -172,7 +172,7 @@ function ideaListHTML() {
       <span class="emoji">${r.emoji}</span>
       <span class="grow"><strong>${esc(r.name)}</strong> <span class="badge" style="--c:#f97316">${t('aiBadge', state.lang)}</span>
         <span class="meta">${tierBadge(r.tier)} <span class="muted">⏱ ${r.minutes || 20}m</span></span></span>
-      ${state.favorites.indexOf(r.id) >= 0 ? '<span class="pink">♥</span>' : ''}<span class="chev">›</span>
+      ${(state.favorites || []).indexOf(r.id) >= 0 ? '<span class="pink">♥</span>' : ''}<span class="chev">›</span>
     </button>`).join('')}</div></section>`;
 }
 
@@ -193,12 +193,15 @@ function ideasView() {
     <div id="ideaList">${ideaListHTML()}</div>`;
 }
 
-// JAVÍTVA: BÁRMILYEN RECEPTET MEGTALÁL (STATIKUS ÉS AI IS)
 function findRecipeAnywhere(id) {
   if (RECIPE_BY_ID[id]) return RECIPE_BY_ID[id];
   if (state.aiRecipes) {
     const found = state.aiRecipes.find(r => r.id === id);
     if (found) return found;
+  }
+  if (state.favoriteRecipes) {
+    const favFound = state.favoriteRecipes.find(r => r.id === id);
+    if (favFound) return favFound;
   }
   return null;
 }
@@ -208,7 +211,7 @@ function detailView() {
   if (!r) return `<div class="detailbar"><button class="link" data-act="back">${t('backBtn', state.lang)}</button></div><p class="pad">Nem található.</p>`;
 
   const factor = ui.servings / Math.max(r.servings, 1);
-  const fav = state.favorites.indexOf(r.id) >= 0;
+  const fav = (state.favorites || []).indexOf(r.id) >= 0;
 
   const rows = r.ing.map(x => {
     let emoji = '🍲';
@@ -362,12 +365,34 @@ const actions = {
   open: d => openRecipe(d.id),
   back: () => history.back(),
   fav: d => {
+    if (!state.favorites) state.favorites = [];
+    if (!state.favoriteRecipes) state.favoriteRecipes = [];
+    
     const i = state.favorites.indexOf(d.id);
-    if (i >= 0) state.favorites.splice(i, 1); else state.favorites.push(d.id);
-    persist(); render();
+    const recipeObj = findRecipeAnywhere(d.id);
+
+    if (i >= 0) {
+      // Ha már kedvenc volt, kiszedjük
+      state.favorites.splice(i, 1);
+      state.favoriteRecipes = state.favoriteRecipes.filter(r => r.id !== d.id);
+    } else {
+      // Ha nem volt kedvenc, beletesszük a fix tárolóba is
+      state.favorites.push(d.id);
+      if (recipeObj && !state.favoriteRecipes.some(r => r.id === d.id)) {
+        state.favoriteRecipes.push(recipeObj);
+      }
+    }
+    persist(); 
+    render();
   },
   favOnly: () => { ui.favOnly = !ui.favOnly; render(); },
-  random: () => { const r = randomRecipe(ui.tier); if (r) openRecipe(r.id); },
+  random: () => { 
+    const pool = ui.favOnly ? (state.favoriteRecipes || []) : (state.aiRecipes || []);
+    const filteredPool = pool.filter(r => !ui.tier || r.tier === ui.tier);
+    if (!filteredPool.length) return;
+    const r = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+    if (r) openRecipe(r.id); 
+  },
   srv: d => {
     ui.servings = Math.min(12, Math.max(1, ui.servings + Number(d.d)));
     state.household = ui.servings;
